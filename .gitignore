@@ -2,5 +2,7 @@
 *.mtx
 /data/*
 /plots/*
+/src/old/*
 /__pycache__/
 *.pyc
+*.png

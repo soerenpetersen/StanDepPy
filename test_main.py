@@ -7,40 +7,47 @@ from src import utils
 import numpy as np
 import show
 import pandas as pd
+import csv
 
 # True: Bcells
 # False: Celegans
-dataset = False
+#dataset = False
 # column index in metadata CSV for cell types (0-based)
 cell_type_column = 1  # z.B. Spalte 1 enthält Zelltypen
 
-if not dataset:
-    # Celegans
-    model_path = "data/model/iCEL1314.xml"
-    c_path = "data/core_files/celegans/caenorhabditis.elegans.SCE.QCed_qc.mtx"
-    g_path = "data/core_files/celegans/caenorhabditis.elegans.SCE.QCed_features.csv"
-    s_path = "data/core_files/celegans/caenorhabditis.elegans.SCE.QCed_metadata.csv"
+# if not dataset:
+#     # Celegans
+#     model_path = "data/model/iCEL1314.xml"
+#     c_path = "data/core_files/celegans/caenorhabditis.elegans.SCE.QCed_qc.mtx"
+#     g_path = "data/core_files/celegans/caenorhabditis.elegans.SCE.QCed_features.csv"
+#     s_path = "data/core_files/celegans/caenorhabditis.elegans.SCE.QCed_metadata.csv"
 
-if dataset:
-    # Bcells
-    model_path = "data/model/Recon3DModel_301.xml"
-    c_path = "data/core_files/bcells/count_matrix.mtx"
-    g_path = "data/core_files/bcells/rownames_translated.csv"
-    s_path = "data/core_files/bcells/colnames.csv"
+# if dataset:
+#     # Bcells
+#     model_path = "data/model/Recon3DModel_301.xml"
+#     c_path = "data/core_files/bcells/count_matrix.mtx"
+#     g_path = "data/core_files/bcells/rownames_translated.csv"
+#     s_path = "data/core_files/bcells/colnames.csv"
 
-# Lade ExpressionData und Metadata (Zelltypen)
-expr = data.load_expression_data(
-    counts_path=c_path,
-    genes_path=g_path,
-    samples_path=s_path,
-    cell_type_column=cell_type_column
-)
+# # Lade ExpressionData und Metadata (Zelltypen)
+# expr = data.load_expression_data(
+#     counts_path=c_path,
+#     genes_path=g_path,
+#     samples_path=s_path,
+#     cell_type_column=cell_type_column
+# )
+
+model_path = "data/model/iCEL1314.xml"
+full_mtx_path = "caenorhabditiselegansSCEQCed_full_mtx.csv"
+
+# Lade ExpressionData aus CSV
+expr = data.load_expression_csv_as_df(full_mtx_path)
 
 # SBML-Modell einlesen
 model = modeldata.load_model(model_path)
+
 # ExpressionData auf Modell-Gene matchen
 model_data = modeldata.get_model_data(expr, model)
-
 print(f"Genes present: {len(model_data.ID_genePresent)}")
 print(f"Genes missing: {len(model_data.ID_geneMissing)}")
 
@@ -58,9 +65,7 @@ enzyme_gene_list = enzymes.get_gene_to_enzym_list(enzymeData)
 
 enzyme_gene_list.to_csv('enzyme_gene_list.csv', index=False)
 
-bootstrapped_mtx = data.load_expression_csv("caenorhabditiselegansSCEQCed_full_mtx.csv")
-
-rxn_matrix = enzymes.translate_gene_matrix(bootstrapped_mtx, enzyme_gene_list, mode="GM1")
+rxn_matrix = enzymes.translate_gene_matrix(expr, enzyme_gene_list, mode="GM1")
 
 utils.plot_reaction_distribution(rxn_matrix, "rxn_distribution.png", bins="auto", log10=True, include_zeros=False)
 
@@ -70,20 +75,21 @@ edges = [-2, -1, 0, 1, 2, 2.5, 3, 4]
 
 res, adj_edges = clustering.bin_reaction_expression(rxn_matrix, edges, adjust_bins=True)
 
-res_norm = clustering.norm_bin_counts(res)
-
-res_norm.to_csv('binned_rxn_matrix.csv', index=False)
+res.to_csv('binned_rxn_matrix.csv', index=False)
 
 print(adj_edges)
 
-#clustering.plot_jaccard_curve(res_norm, max_k=100, save_path="jaccard_curve.png")
 
-df_clusters, chosen_bin = clustering.cluster_reactions_iterative(res_norm, rxn_matrix, max_k=100, similarity_threshold=0.9)
+df_clusters, chosen_bin, thresholds = clustering.cluster_reactions_iterative(res, rxn_matrix, max_k=100, similarity_threshold=0.98)
 
 df_clusters.to_csv('clustered_reactions.csv', index=False)
 chosen_bin.to_csv('cluster_stats.csv', index=False)
 
-#print(out)
+df_thr = pd.DataFrame(
+    list(thresholds.items()),
+    columns=["cluster", "threshold"]
+)
+df_thr.to_csv("cluster_thresholds.csv", index=False)
 
 
 
