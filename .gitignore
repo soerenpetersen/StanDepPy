@@ -1,0 +1,6 @@
+*.csv
+*.mtx
+/data/*
+/plots/*
+/__pycache__/
+*.pyc
